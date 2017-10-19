@@ -1,4 +1,4 @@
-import time
+import sys
 import aiohttp
 import logging
 from opsdroid.connector import Connector
