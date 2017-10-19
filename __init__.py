@@ -15,10 +15,11 @@ class ConnectorMatrix(Connector):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
-        self.default_room = "#tan:matrix.org"  # The default room for messages
-        self.botname = "@cadairbot:cadair.com"
-        self.homeserver = "https://matrix.cadair.com"
-        self.password = ""
+        self.default_room = config['room']
+        self.mxid = config['mxid']
+        self.nick = config.get('nick', 'Bot')
+        self.homeserver = config.get('homeserver', "https://matrix.org")
+        self.password = config['password']
 
     @property
     def filter_json(self):
@@ -59,7 +60,7 @@ class ConnectorMatrix(Connector):
         fjson['room']['rooms'].append(room_id)
 
         resp = await api.create_filter(
-            user_id=self.botname, filter_params=fjson)
+            user_id=self.mxid, filter_params=fjson)
 
         return resp['filter_id']
 
@@ -70,7 +71,7 @@ class ConnectorMatrix(Connector):
 
         self.session = session
         login_response = await mapi.login(
-            "m.login.password", user=self.botname, password=self.password)
+            "m.login.password", user=self.mxid, password=self.password)
         mapi.token = login_response['access_token']
         mapi.sync_token = None
 
@@ -87,6 +88,14 @@ class ConnectorMatrix(Connector):
             set_presence="online")
         self.connection.sync_token = response["next_batch"]
 
+        if await self.connection.get_display_name(self.mxid) != self.nick:
+            # This call is broken through the async wrapper so let's do it
+            # ourselves.
+            # await self.connection.set_display_name(self.mxid, self.nick)
+
+            await self.connection._send("PUT", "/profile/{}/displayname".format(self.mxid),
+                                        {"displayname": self.nick})
+
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
@@ -98,7 +107,7 @@ class ConnectorMatrix(Connector):
                 if room and 'timeline' in room:
                     for event in room['timeline']['events']:
                         if event['content']['msgtype'] == 'm.text':
-                            if event['sender'] != self.botname:
+                            if event['sender'] != self.mxid:
                                 message = Message(event['content']['body'],
                                                   event['sender'], None, self)
                                 await opsdroid.parse(message)
