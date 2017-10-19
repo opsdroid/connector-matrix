@@ -17,7 +17,7 @@ class ConnectorMatrix(Connector):
         self.config = config  # The config dictionary to be accessed later
         self.default_room = config['room']
         self.mxid = config['mxid']
-        self.nick = config.get('nick', 'Bot')
+        self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
         self.password = config['password']
 
@@ -88,7 +88,7 @@ class ConnectorMatrix(Connector):
             set_presence="online")
         self.connection.sync_token = response["next_batch"]
 
-        if await self.connection.get_display_name(self.mxid) != self.nick:
+        if self.nick and await self.connection.get_display_name(self.mxid) != self.nick:
             # This call is broken through the async wrapper so let's do it
             # ourselves.
             # await self.connection.set_display_name(self.mxid, self.nick)
