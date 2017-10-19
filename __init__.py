@@ -34,9 +34,28 @@ class ConnectorMatrix(Connector):
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
-            response = await self.connection.sync(self.connection.sync_token, 3000, filter='{ "room": { "timeline" : { "limit" : %i } } }' % 10)
-            self.connection.sync_token = response["next_batch"]
-            _LOGGER.debug("listening")
+            try:
+                response = await self.connection.sync(
+                    self.connection.sync_token, 3000,
+                    filter='{ "room": { "timeline" : { "limit" : 10 } } }')
+                self.connection.sync_token = response["next_batch"]
+                try:
+                    room = response['rooms']['join'][self.room_id]
+                except KeyError:
+                    continue
+                for event in room['timeline']['events']:
+                    if event['content']['msgtype'] == 'm.text':
+                        if event['sender'] != self.botname:
+                            message = Message(event['content']['body'],
+                                              event['sender'],
+                                              None,
+                                              self)
+                            await opsdroid.parse(message)
+            except KeyError:
+                continue
+            except Exception as e:
+                _LOGGER.debug('request failed', e)
+                sys.exit()
 
     async def respond(self, message):
         # Send message.text back to the chat service
