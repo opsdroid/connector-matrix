@@ -14,7 +14,8 @@ class ConnectorMatrix(Connector):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
-        self.default_room = "#DnD:matrix.org"  # The default room for messages
+        self.default_room = "#tan:matrix.org"  # The default room for messages
+        self.botname = "@DMBot:matrix.org"
 
     async def connect(self, opsdroid):
         # Create connection object with chat library
