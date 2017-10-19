@@ -1,10 +1,11 @@
 import sys
-import aiohttp
 import logging
+
+import aiohttp
 from opsdroid.connector import Connector
 from opsdroid.message import Message
 
-from matrix_client.async_api import AsyncHTTPAPI
+from .matrix_async import AsyncHTTPAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,44 +16,90 @@ class ConnectorMatrix(Connector):
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
         self.default_room = "#tan:matrix.org"  # The default room for messages
-        self.botname = "@DMBot:matrix.org"
+        self.botname = "@cadairbot:cadair.com"
+        self.homeserver = "https://matrix.cadair.com"
+
+    @property
+    def filter_json(self):
+        return {
+            "event_format": "client",
+            "account_data": {
+                "limit": 0,
+                "types": []
+            },
+            "presence": {
+                "limit": 0,
+                "types": []
+            },
+            "room": {
+                "rooms": [],
+                "account_data": {
+                    "types": []
+                },
+                "timeline": {
+                    "limit": 10
+                },
+                "ephemeral": {
+                    "types": []
+                },
+                "state": {
+                    "types": []
+                }
+            }
+        }
+
+    async def make_filter(self, api, room_id):
+        """
+        Make a filter on the server for future syncs.
+        """
+
+        fjson = self.filter_json
+        fjson['room']['rooms'].append(room_id)
+
+        resp = await api.create_filter(
+            user_id=self.botname, filter_params=fjson)
+
+        return resp['filter_id']
 
     async def connect(self, opsdroid):
         # Create connection object with chat library
         session = aiohttp.ClientSession()
-        mapi = AsyncHTTPAPI("http://matrix.org", session)
+        mapi = AsyncHTTPAPI(self.homeserver, session)
+
         self.session = session
-        login_response = await mapi.login("m.login.password",
-                                          user=self.botname,
-                                          password="somepassword")
+        login_response = await mapi.login(
+            "m.login.password", user=self.botname, password=self.password)
         mapi.token = login_response['access_token']
         mapi.sync_token = None
+
         response = await mapi.join_room(self.default_room)
         self.room_id = response['room_id']
         self.connection = mapi
 
+        # Create a filter now, saves time on each later sync
+        self.filter_id = await self.make_filter(mapi, self.room_id)
+
+        # Do initial sync so we don't get old messages later.
+        response = await self.connection.sync(
+            timeout_ms=3000, filter='{ "room": { "timeline" : { "limit" : 1 } } }',
+            set_presence="online")
+        self.connection.sync_token = response["next_batch"]
+
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
+            response = await self.connection.sync(
+                self.connection.sync_token, timeout_ms=3000, filter=self.filter_id)
+            self.connection.sync_token = response["next_batch"]
             try:
-                response = await self.connection.sync(
-                    self.connection.sync_token, 3000,
-                    filter='{ "room": { "timeline" : { "limit" : 10 } } }')
-                self.connection.sync_token = response["next_batch"]
-                try:
-                    room = response['rooms']['join'][self.room_id]
-                except KeyError:
-                    continue
-                for event in room['timeline']['events']:
-                    if event['content']['msgtype'] == 'm.text':
-                        if event['sender'] != self.botname:
-                            message = Message(event['content']['body'],
-                                              event['sender'],
-                                              None,
-                                              self)
-                            await opsdroid.parse(message)
-            except KeyError:
-                continue
+                room = response['rooms']['join'].get(self.room_id, None)
+                if room and 'timeline' in room:
+                    for event in room['timeline']['events']:
+                        if event['content']['msgtype'] == 'm.text':
+                            if event['sender'] != self.botname:
+                                message = Message(event['content']['body'],
+                                                  event['sender'], None, self)
+                                await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.debug('request failed', e)
                 sys.exit()
