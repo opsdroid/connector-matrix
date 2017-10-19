@@ -59,5 +59,4 @@ class ConnectorMatrix(Connector):
 
     async def respond(self, message):
         # Send message.text back to the chat service
-        _LOGGER.debug("response triggered")
-        self.connection.send_message(self.room_id, message)
+        await self.connection.send_message(self.room_id, message.text)
