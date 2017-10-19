@@ -18,6 +18,7 @@ class ConnectorMatrix(Connector):
         self.default_room = "#tan:matrix.org"  # The default room for messages
         self.botname = "@cadairbot:cadair.com"
         self.homeserver = "https://matrix.cadair.com"
+        self.password = ""
 
     @property
     def filter_json(self):
@@ -37,7 +38,8 @@ class ConnectorMatrix(Connector):
                     "types": []
                 },
                 "timeline": {
-                    "limit": 10
+                    "limit": 10,
+                    "types": ["m.room.message"]
                 },
                 "ephemeral": {
                     "types": []
