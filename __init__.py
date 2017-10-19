@@ -19,14 +19,16 @@ class ConnectorMatrix(Connector):
 
     async def connect(self, opsdroid):
         # Create connection object with chat library
-        async with aiohttp.ClientSession() as session:
-            mapi = AsyncHTTPAPI("http://matrix.org", session)
-            self.session = session
-            login_response = await mapi.login("m.login.password", user="@DMBot:matrix.org", password="dungeonmaster2017")
-            mapi.token = login_response['access_token']
-            mapi.sync_token = None
-            response = await mapi.join_room(self.default_room)
-            self.room_id = response['room_id']
+        session = aiohttp.ClientSession()
+        mapi = AsyncHTTPAPI("http://matrix.org", session)
+        self.session = session
+        login_response = await mapi.login("m.login.password",
+                                          user=self.botname,
+                                          password="somepassword")
+        mapi.token = login_response['access_token']
+        mapi.sync_token = None
+        response = await mapi.join_room(self.default_room)
+        self.room_id = response['room_id']
         self.connection = mapi
 
     async def listen(self, opsdroid):
