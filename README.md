@@ -5,6 +5,10 @@ A connector for [opsdroid](https://github.com/opsdroid/opsdroid) to receive and 
 ## Requirements
 
 To use this connector you will need to have a matrix account, and login using your matrix username (mxid) and password.
+You'll also need to install the martix_client module:
+```
+pip install matrix_client
+```
 
 ## Configuration
 
