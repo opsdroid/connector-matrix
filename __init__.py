@@ -112,8 +112,7 @@ class ConnectorMatrix(Connector):
                                                   event['sender'], None, self)
                                 await opsdroid.parse(message)
             except Exception as e:
-                _LOGGER.debug('request failed', e)
-                sys.exit()
+                _LOGGER.exception('Matrix Sync Error')
 
     async def respond(self, message):
         # Send message.text back to the chat service
