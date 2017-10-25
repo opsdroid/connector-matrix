@@ -79,7 +79,7 @@ class ConnectorMatrix(Connector):
         self.connection = mapi
 
         # Create a filter now, saves time on each later sync
-        self.filter_id = await self.make_filter(mapi, self.room_id)
+        #self.filter_id = await self.make_filter(mapi, self.room_id)
 
         # Do initial sync so we don't get old messages later.
         response = await self.connection.sync(
@@ -103,8 +103,9 @@ class ConnectorMatrix(Connector):
         while True:
             response = await self.connection.sync(
                 self.connection.sync_token,
-                timeout_ms=6 * 60 * 60 * 1e3,  # 6 hours in ms
-                filter=self.filter_id)
+                timeout_ms=3000,#6 * 60 * 60 * 1e3,  # 6 hours in ms
+                filter='{ "room": { "timeline" : { "limit" : 10 } } }')
+                #filter=self.filter_id)
             self.connection.sync_token = response["next_batch"]
             try:
                 room = response['rooms']['join'].get(self.room_id, None)
