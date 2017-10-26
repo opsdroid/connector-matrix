@@ -59,7 +59,8 @@ class ConnectorMatrix(Connector):
         fjson = self.filter_json
         fjson['room']['rooms'].append(room_id)
 
-        resp = await api.create_filter(user_id=self.mxid, filter_params=fjson)
+        resp = await api.create_filter(
+            user_id=self.mxid, filter_params=fjson)
 
         return resp['filter_id']
 
@@ -83,28 +84,23 @@ class ConnectorMatrix(Connector):
 
         # Do initial sync so we don't get old messages later.
         response = await self.connection.sync(
-            timeout_ms=3000,
-            filter='{ "room": { "timeline" : { "limit" : 1 } } }',
+            timeout_ms=3000, filter='{ "room": { "timeline" : { "limit" : 1 } } }',
             set_presence="online")
         self.connection.sync_token = response["next_batch"]
 
-        if self.nick and await self.connection.get_display_name(
-                self.mxid) != self.nick:
+        if self.nick and await self.connection.get_display_name(self.mxid) != self.nick:
             # This call is broken through the async wrapper so let's do it
             # ourselves.
             # await self.connection.set_display_name(self.mxid, self.nick)
 
-            await self.connection._send(
-                "PUT", "/profile/{}/displayname".format(self.mxid),
-                {"displayname": self.nick})
+            await self.connection._send("PUT", "/profile/{}/displayname".format(self.mxid),
+                                        {"displayname": self.nick})
 
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
             response = await self.connection.sync(
-                self.connection.sync_token,
-                timeout_ms=6 * 60 * 60 * 1e3,  # 6 hours in ms
-                filter=self.filter_id)
+                self.connection.sync_token, timeout_ms=3000, filter=self.filter_id)
             self.connection.sync_token = response["next_batch"]
             try:
                 room = response['rooms']['join'].get(self.room_id, None)
