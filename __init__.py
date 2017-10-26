@@ -100,7 +100,10 @@ class ConnectorMatrix(Connector):
         # Listen for new messages from the chat service
         while True:
             response = await self.connection.sync(
-                self.connection.sync_token, timeout_ms=3000, filter=self.filter_id)
+                self.connection.sync_token,
+                timeout_ms=6 * 60 * 60 * 1e3,  # 6h in ms
+                filter=self.filter_id)
+            _LOGGER.debug("matrix sync request returned")
             self.connection.sync_token = response["next_batch"]
             try:
                 room = response['rooms']['join'].get(self.room_id, None)
