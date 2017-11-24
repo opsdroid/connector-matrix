@@ -22,7 +22,3 @@ connectors:
     homeserver: "https://matrix.org"
     nick: "Botty McBotface"  # The nick will be set on startup
 ```
-
-## License
-
-GNU General Public License Version 3 (GPLv3)
