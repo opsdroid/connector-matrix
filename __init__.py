@@ -103,7 +103,7 @@ class ConnectorMatrix(Connector):
         while True:
             response = await self.connection.sync(
                 self.connection.sync_token,
-                timeout_ms=3000,#6 * 60 * 60 * 1e3,  # 6 hours in ms
+                timeout_ms=21600000, # 6 hours in ms
                 filter='{ "room": { "timeline" : { "limit" : 10 } } }')
                 #filter=self.filter_id)
             self.connection.sync_token = response["next_batch"]
