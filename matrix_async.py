@@ -38,7 +38,7 @@ class AsyncHTTPAPI(MatrixHttpApi):
                     content=None,
                     query_params={},
                     headers={},
-                    api_path="/_matrix/client/api/r0"):
+                    api_path="/_matrix/client/r0"):
         if not content:
             content = {}
 
