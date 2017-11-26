@@ -1,1 +1,1 @@
-from .matrix import ConnectorMatrix
+from .connector import ConnectorMatrix
