@@ -109,7 +109,7 @@ class ConnectorMatrix(Connector):
                         if event['content']['msgtype'] == 'm.text':
                             if event['sender'] != self.mxid:
                                 message = Message(event['content']['body'],
-                                                  event['sender'], None, self)
+                                                  await get_display_name(event['sender']), None, self)
                                 await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
