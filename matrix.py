@@ -9,6 +9,8 @@ from .matrix_async import AsyncHTTPAPI
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = ['ConnectorMatrix']
+
 
 class ConnectorMatrix(Connector):
     def __init__(self, config):
@@ -89,19 +91,14 @@ class ConnectorMatrix(Connector):
         self.connection.sync_token = response["next_batch"]
 
         if self.nick and await self.connection.get_display_name(self.mxid) != self.nick:
-            # This call is broken through the async wrapper so let's do it
-            # ourselves.
-            # await self.connection.set_display_name(self.mxid, self.nick)
-
-            await self.connection._send("PUT", "/profile/{}/displayname".format(self.mxid),
-                                        {"displayname": self.nick})
+            await self.connection.set_display_name(self.mxid, self.nick)
 
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
             response = await self.connection.sync(
                 self.connection.sync_token,
-                timeout_ms=6 * 60 * 60 * 1e3,  # 6h in ms
+                timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
                 filter=self.filter_id)
             _LOGGER.debug("matrix sync request returned")
             self.connection.sync_token = response["next_batch"]
@@ -120,3 +117,6 @@ class ConnectorMatrix(Connector):
     async def respond(self, message):
         # Send message.text back to the chat service
         await self.connection.send_message(self.room_id, message.text)
+
+    async def disconnect(self):
+        self.session.close()
