@@ -105,7 +105,8 @@ class AsyncHTTPAPI(MatrixHttpApi):
         if room_id.startswith('#'):
             room_id = await self.get_room_id(room_id)
 
-        members = await self.get_room_members(room_id)['chunk']
+        members = await self.get_room_members(room_id)
+        members = members['chunk']
         for mem in members:
             if mem['sender'] == mxid:
                 return mem['content']['displayname']
