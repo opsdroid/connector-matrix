@@ -96,13 +96,13 @@ class ConnectorMatrix(Connector):
     async def listen(self, opsdroid):
         # Listen for new messages from the chat service
         while True:
-            response = await self.connection.sync(
-                self.connection.sync_token,
-                timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
-                filter=self.filter_id)
-            _LOGGER.debug("matrix sync request returned")
-            self.connection.sync_token = response["next_batch"]
             try:
+                response = await self.connection.sync(
+                    self.connection.sync_token,
+                    timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
+                    filter=self.filter_id)
+                _LOGGER.debug("matrix sync request returned")
+                self.connection.sync_token = response["next_batch"]
                 room = response['rooms']['join'].get(self.room_id, None)
                 if room and 'timeline' in room:
                     for event in room['timeline']['events']:
