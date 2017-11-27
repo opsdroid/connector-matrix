@@ -108,6 +108,6 @@ class AsyncHTTPAPI(MatrixHttpApi):
         members = await self.get_room_members(room_id)
         members = members['chunk']
         for mem in members:
-            if mem['sender'] == mxid:
+            if mem['sender'] == user_id:
                 return mem['content']['displayname']
 
