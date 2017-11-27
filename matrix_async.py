@@ -38,7 +38,7 @@ class AsyncHTTPAPI(MatrixHttpApi):
                     content=None,
                     query_params={},
                     headers={},
-                    api_path="/_matrix/client/api/v1"):
+                    api_path="/_matrix/client/r0"):
         if not content:
             content = {}
 
@@ -76,6 +76,10 @@ class AsyncHTTPAPI(MatrixHttpApi):
     async def get_display_name(self, user_id):
         content = await self._send("GET", "/profile/%s/displayname" % user_id)
         return content.get('displayname', None)
+
+    async def set_display_name(self, user_id, display_name):
+        content = {"displayname": display_name}
+        await self._send("PUT", "/profile/%s/displayname" % user_id, content)
 
     async def get_avatar_url(self, user_id):
         content = await self._send("GET", "/profile/%s/avatar_url" % user_id)
