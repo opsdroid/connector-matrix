@@ -14,7 +14,6 @@ To use this connector you will need to have a Matrix account, and login using yo
 connectors:
   - name: matrix
     # Required
-    repo: https://github.com/solardrew/connector-matrix.git
     mxid: "@username:matrix.org"
     password: "mypassword"
     room: "#matrix:matrix.org"
