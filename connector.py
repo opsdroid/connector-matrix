@@ -109,7 +109,8 @@ class ConnectorMatrix(Connector):
                         if event['content']['msgtype'] == 'm.text':
                             if event['sender'] != self.mxid:
                                 message = Message(event['content']['body'],
-                                                  await self.connection.get_display_name(event['sender']),
+                                                  await self.connection.get_room_displayname(self.default_room,
+                                                                                             event['sender']),
                                                   None, self)
                                 await opsdroid.parse(message)
             except Exception as e:
