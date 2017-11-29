@@ -99,3 +99,15 @@ class AsyncHTTPAPI(MatrixHttpApi):
             "/directory/room/{}".format(quote(room_alias)),
             api_path="/_matrix/client/r0")
         return content.get("room_id", None)
+
+    async def get_room_displayname(self, room_id, user_id):
+        """Get a users displayname for the given room"""
+        if room_id.startswith('#'):
+            room_id = await self.get_room_id(room_id)
+
+        members = await self.get_room_members(room_id)
+        members = members['chunk']
+        for mem in members:
+            if mem['sender'] == user_id:
+                return mem['content']['displayname']
+
