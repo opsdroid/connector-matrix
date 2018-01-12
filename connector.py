@@ -123,7 +123,8 @@ class ConnectorMatrix(Connector):
 
     async def respond(self, message):
         # Send message.text back to the chat service
-        await self.connection.send_message(self.room_id, message.text)
+        # Connector responds in the same room it received the original message
+        await self.connection.send_message(message.room, message.text)
 
     async def disconnect(self):
         self.session.close()
