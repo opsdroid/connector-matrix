@@ -17,7 +17,9 @@ class ConnectorMatrix(Connector):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
-        self.rooms = config['rooms']
+        self.rooms = config.get('rooms', None)
+        if not self.rooms:
+            self.rooms = {'main': config['room']}
         self.room_ids = {}
         self.default_room = self.rooms['main']
         self.mxid = config['mxid']
