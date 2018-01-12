@@ -107,16 +107,17 @@ class ConnectorMatrix(Connector):
                     filter=self.filter_id)
                 _LOGGER.debug("matrix sync request returned")
                 self.connection.sync_token = response["next_batch"]
-                room = response['rooms']['join'].get(self.room_id, None)
-                if room and 'timeline' in room:
-                    for event in room['timeline']['events']:
-                        if event['content']['msgtype'] == 'm.text':
-                            if event['sender'] != self.mxid:
-                                message = Message(event['content']['body'],
-                                                  await self.connection.get_room_displayname(self.default_room,
-                                                                                             event['sender']),
-                                                  None, self)
-                                await opsdroid.parse(message)
+                for roomid in self.room_ids.values():
+                    room = response['rooms']['join'].get(roomid, None)
+                    if room and 'timeline' in room:
+                        for event in room['timeline']['events']:
+                            if event['content']['msgtype'] == 'm.text':
+                                if event['sender'] != self.mxid:
+                                    message = Message(event['content']['body'],
+                                                    await self.connection.get_room_displayname(self.default_room,
+                                                                                                event['sender']),
+                                                    roomid, self)
+                                    await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
 
