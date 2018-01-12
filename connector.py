@@ -18,6 +18,7 @@ class ConnectorMatrix(Connector):
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
         self.rooms = config['rooms']
+        self.room_ids = {}
         self.default_room = self.rooms['main']
         self.mxid = config['mxid']
         self.nick = config.get('nick', None)
@@ -54,13 +55,14 @@ class ConnectorMatrix(Connector):
             }
         }
 
-    async def make_filter(self, api, room_id):
+    async def make_filter(self, api, room_ids):
         """
         Make a filter on the server for future syncs.
         """
 
         fjson = self.filter_json
-        fjson['room']['rooms'].append(room_id)
+        for room_id in room_ids:
+            fjson['room']['rooms'].append(room_id)
 
         resp = await api.create_filter(
             user_id=self.mxid, filter_params=fjson)
@@ -78,13 +80,13 @@ class ConnectorMatrix(Connector):
         mapi.token = login_response['access_token']
         mapi.sync_token = None
 
-        self.room_id = response['room_id']
         for roomname, room in self.rooms.items():
             response = await mapi.join_room(room)
+            self.room_ids[roomname] = response['room_id']
         self.connection = mapi
 
         # Create a filter now, saves time on each later sync
-        self.filter_id = await self.make_filter(mapi, self.room_id)
+        self.filter_id = await self.make_filter(mapi, self.room_ids.values())
 
         # Do initial sync so we don't get old messages later.
         response = await self.connection.sync(
