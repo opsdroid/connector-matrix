@@ -123,10 +123,13 @@ class ConnectorMatrix(Connector):
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
 
-    async def respond(self, message):
+    async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
-        # Connector responds in the same room it received the original message
-        await self.connection.send_message(message.room, message.text)
+        if not roomname:
+            # Connector responds in the same room it received the original message
+            await self.connection.send_message(message.room, message.text)
+        else:
+            await self.connection.send_message(self.rooms[roomname], message.text)
 
     async def disconnect(self):
         self.session.close()
