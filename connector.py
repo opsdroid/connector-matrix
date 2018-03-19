@@ -17,7 +17,11 @@ class ConnectorMatrix(Connector):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
         self.config = config  # The config dictionary to be accessed later
-        self.default_room = config['room']
+        self.rooms = config.get('rooms', None)
+        if not self.rooms:
+            self.rooms = {'main': config['room']}
+        self.room_ids = {}
+        self.default_room = self.rooms['main']
         self.mxid = config['mxid']
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
@@ -53,13 +57,14 @@ class ConnectorMatrix(Connector):
             }
         }
 
-    async def make_filter(self, api, room_id):
+    async def make_filter(self, api, room_ids):
         """
         Make a filter on the server for future syncs.
         """
 
         fjson = self.filter_json
-        fjson['room']['rooms'].append(room_id)
+        for room_id in room_ids:
+            fjson['room']['rooms'].append(room_id)
 
         resp = await api.create_filter(
             user_id=self.mxid, filter_params=fjson)
@@ -77,12 +82,13 @@ class ConnectorMatrix(Connector):
         mapi.token = login_response['access_token']
         mapi.sync_token = None
 
-        response = await mapi.join_room(self.default_room)
-        self.room_id = response['room_id']
+        for roomname, room in self.rooms.items():
+            response = await mapi.join_room(room)
+            self.room_ids[roomname] = response['room_id']
         self.connection = mapi
 
         # Create a filter now, saves time on each later sync
-        self.filter_id = await self.make_filter(mapi, self.room_id)
+        self.filter_id = await self.make_filter(mapi, self.room_ids.values())
 
         # Do initial sync so we don't get old messages later.
         response = await self.connection.sync(
@@ -103,22 +109,24 @@ class ConnectorMatrix(Connector):
                     filter=self.filter_id)
                 _LOGGER.debug("matrix sync request returned")
                 self.connection.sync_token = response["next_batch"]
-                room = response['rooms']['join'].get(self.room_id, None)
-                if room and 'timeline' in room:
-                    for event in room['timeline']['events']:
-                        if event['content']['msgtype'] == 'm.text':
-                            if event['sender'] != self.mxid:
-                                message = Message(event['content']['body'],
-                                                  await self.connection.get_room_displayname(self.default_room,
-                                                                                             event['sender']),
-                                                  None, self)
-                                await opsdroid.parse(message)
+                for roomid in self.room_ids.values():
+                    room = response['rooms']['join'].get(roomid, None)
+                    if room and 'timeline' in room:
+                        for event in room['timeline']['events']:
+                            if event['content']['msgtype'] == 'm.text':
+                                if event['sender'] != self.mxid:
+                                    message = Message(event['content']['body'],
+                                                    await self.connection.get_room_displayname(self.default_room,
+                                                                                                event['sender']),
+                                                    roomid, self)
+                                    await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
 
     async def respond(self, message):
         # Send message.text back to the chat service
-        await self.connection.send_message(self.room_id, message.text)
+        # Connector responds in the same room it received the original message
+        await self.connection.send_message(message.room, message.text)
 
     async def disconnect(self):
         self.session.close()
