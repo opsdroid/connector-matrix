@@ -6,6 +6,8 @@ from opsdroid.connector import Connector
 from opsdroid.message import Message
 
 from .matrix_async import AsyncHTTPAPI
+from matrix_client.errors import MatrixRequestError
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,9 +131,17 @@ class ConnectorMatrix(Connector):
         setting.
         """
         if self.room_specific_nicks:
-            return await self.connection.get_room_displayname(roomid, mxid)
-        else:
+            try:
+                return await self.connection.get_room_displayname(roomid, mxid)
+            except Exception as e:
+                # Fallback to the non-room specific one
+                logging.exception("Failed to lookup room specific nick for {}".format(mxid))
+
+        try:
             return await self.connection.get_display_name(mxid)
+        except MatrixRequestError as e:
+            logging.exception("Failed to lookup nick for {}".format(mxid))
+            return mxid
 
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
