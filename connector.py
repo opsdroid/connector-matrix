@@ -26,6 +26,7 @@ class ConnectorMatrix(Connector):
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
         self.password = config['password']
+        self.room_specific_nicks = config.get("room_specific_nicks", False)
 
     @property
     def filter_json(self):
@@ -116,12 +117,21 @@ class ConnectorMatrix(Connector):
                             if event['content']['msgtype'] == 'm.text':
                                 if event['sender'] != self.mxid:
                                     message = Message(event['content']['body'],
-                                                    await self.connection.get_room_displayname(roomid,
-                                                                                                event['sender']),
-                                                    roomid, self)
+                                                      await self._get_nick(roomid, event['sender']),
+                                                      roomid, self)
                                     await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
+
+    async def _get_nick(self, roomid, mxid):
+        """
+        Get the nickname of a sender depending on the room specific config
+        setting.
+        """
+        if self.room_specific_nicks:
+            return await self.connection.get_room_displayname(roomid, mxid)
+        else:
+            return await self.connection.get_display_name(mxid)
 
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
