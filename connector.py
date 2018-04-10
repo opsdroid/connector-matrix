@@ -147,11 +147,20 @@ class ConnectorMatrix(Connector):
 
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
+
         if not roomname:
             # Connector responds in the same room it received the original message
-            await self.connection.send_message(message.room, message.text)
+            room_id = message.room
         else:
-            await self.connection.send_message(self.rooms[roomname], message.text)
+            room_id = self.rooms[roomname]
+
+        # Ensure we have a room id not alias
+        if not room_id.startswith('!'):
+            room_id = await self.connection.get_room_id(room_id)
+        else:
+            room_id = room_id
+
+        await self.connection.send_message(room_id, message.text)
 
     async def disconnect(self):
         self.session.close()
