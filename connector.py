@@ -140,7 +140,9 @@ class ConnectorMatrix(Connector):
         try:
             return await self.connection.get_display_name(mxid)
         except MatrixRequestError as e:
-            logging.exception("Failed to lookup nick for {}".format(mxid))
+            # Log the error if it's not the 404 from the user not having a nick
+            if e.code != 404:
+                logging.exception("Failed to lookup nick for {}".format(mxid))
             return mxid
 
     async def respond(self, message, roomname=None):
