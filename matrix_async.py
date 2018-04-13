@@ -65,7 +65,8 @@ class AsyncHTTPAPI(MatrixHttpApi):
                 headers=headers)
             async with request as response:
                 if response.status == 429:
-                    await sleep(response.json()['retry_after_ms'] / 1000)
+                    respjson = await response.json()
+                    await sleep(respjson['retry_after_ms'] / 1000)
                 elif response.status < 200 or response.status >= 300:
                     raise MatrixRequestError(
                         code=response.status, content=await response.text())
