@@ -6,6 +6,8 @@ from opsdroid.connector import Connector
 from opsdroid.message import Message
 
 from .matrix_async import AsyncHTTPAPI
+from matrix_client.errors import MatrixRequestError
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ class ConnectorMatrix(Connector):
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
         self.password = config['password']
+        self.room_specific_nicks = config.get("room_specific_nicks", False)
 
     @property
     def filter_json(self):
@@ -116,20 +119,48 @@ class ConnectorMatrix(Connector):
                             if event['content']['msgtype'] == 'm.text':
                                 if event['sender'] != self.mxid:
                                     message = Message(event['content']['body'],
-                                                      await self.connection.get_room_displayname(self.default_room,
-                                                                                                 event['sender']),
+                                                      await self._get_nick(roomid, event['sender']),
                                                       roomid, self)
                                     await opsdroid.parse(message)
             except Exception as e:
                 _LOGGER.exception('Matrix Sync Error')
 
+    async def _get_nick(self, roomid, mxid):
+        """
+        Get the nickname of a sender depending on the room specific config
+        setting.
+        """
+        if self.room_specific_nicks:
+            try:
+                return await self.connection.get_room_displayname(roomid, mxid)
+            except Exception as e:
+                # Fallback to the non-room specific one
+                logging.exception("Failed to lookup room specific nick for {}".format(mxid))
+
+        try:
+            return await self.connection.get_display_name(mxid)
+        except MatrixRequestError as e:
+            # Log the error if it's not the 404 from the user not having a nick
+            if e.code != 404:
+                logging.exception("Failed to lookup nick for {}".format(mxid))
+            return mxid
+
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
+
         if not roomname:
             # Connector responds in the same room it received the original message
-            await self.connection.send_message(message.room, message.text)
+            room_id = message.room
         else:
-            await self.connection.send_message(self.rooms[roomname], message.text)
+            room_id = self.rooms[roomname]
+
+        # Ensure we have a room id not alias
+        if not room_id.startswith('!'):
+            room_id = await self.connection.get_room_id(room_id)
+        else:
+            room_id = room_id
+
+        await self.connection.send_message(room_id, message.text)
 
     async def disconnect(self):
         self.session.close()

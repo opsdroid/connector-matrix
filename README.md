@@ -26,4 +26,5 @@ connectors:
     # Optional
     homeserver: "https://matrix.org"
     nick: "Botty McBotface"  # The nick will be set on startup
+    room_specific_nicks: False  # Look up room specific nicknames of senders (expensive in large rooms)
 ```
