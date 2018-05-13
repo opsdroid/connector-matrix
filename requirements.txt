@@ -1,1 +1,1 @@
-matrix_client>=0.0.5
+git+https://github.com/tinloaf/matrix-python-sdk@groups
