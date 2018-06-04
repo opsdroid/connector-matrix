@@ -112,7 +112,7 @@ class ConnectorMatrix(Connector):
                         timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
                         filter=self.filter_id)
                 except aiohttp.client_exceptions.ServerDisconnectedError:
-                    # Retry after the faild first attempt (issue #26)
+                    # Retry after the failed first attempt (issue #26)
                     _LOGGER.debug("retry sync after the failed first attempt")
                     response = await self.connection.sync(
                         self.connection.sync_token,
@@ -171,7 +171,7 @@ class ConnectorMatrix(Connector):
         try:
             await self.connection.send_message(room_id, message.text)
         except aiohttp.client_exceptions.ServerDisconnectedError:
-            # Retry after the faild first attempt (issue #26)
+            # Retry after the failed first attempt (issue #26)
             _LOGGER.debug("retry send after the failed first attempt")
             await self.connection.send_message(room_id, message.text)
 
