@@ -106,10 +106,18 @@ class ConnectorMatrix(Connector):
         # Listen for new messages from the chat service
         while True:
             try:
-                response = await self.connection.sync(
-                    self.connection.sync_token,
-                    timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
-                    filter=self.filter_id)
+                try:
+                    response = await self.connection.sync(
+                        self.connection.sync_token,
+                        timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
+                        filter=self.filter_id)
+                except aiohttp.client_exceptions.ServerDisconnectedError:
+                    # Retry after the faild first attempt (issue #26)
+                    _LOGGER.debug("retry sync after the failed first attempt")
+                    response = await self.connection.sync(
+                        self.connection.sync_token,
+                        timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
+                        filter=self.filter_id)                    
                 _LOGGER.debug("matrix sync request returned")
                 self.connection.sync_token = response["next_batch"]
                 for roomid in self.room_ids.values():
@@ -160,7 +168,12 @@ class ConnectorMatrix(Connector):
         else:
             room_id = room_id
 
-        await self.connection.send_message(room_id, message.text)
+        try:
+            await self.connection.send_message(room_id, message.text)
+        except aiohttp.client_exceptions.ServerDisconnectedError:
+            # Retry after the faild first attempt (issue #26)
+            _LOGGER.debug("retry send after the failed first attempt")
+            await self.connection.send_message(room_id, message.text)
 
     async def disconnect(self):
         self.session.close()
