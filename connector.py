@@ -153,6 +153,18 @@ class ConnectorMatrix(Connector):
                 logging.exception("Failed to lookup nick for {}".format(mxid))
             return mxid
 
+    async def _get_html_content(self, html, body=None, msgtype="m.text"):
+        """
+        Return the json representation of the message in
+        "org.matrix.custom.html" format
+        """
+        return {
+            "body": body if body else re.sub('<[^<]+?>', '', html),
+            "msgtype": msgtype,
+            "format": "org.matrix.custom.html",
+            "formatted_body": html
+            }   
+
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
 
@@ -169,11 +181,13 @@ class ConnectorMatrix(Connector):
             room_id = room_id
 
         try:
-            await self.connection.send_message(room_id, message.text)
+            await self.connection.send_message_event(room_id, 
+                "m.room.message", await self._get_html_content(message.text))
         except aiohttp.client_exceptions.ServerDisconnectedError:
             # Retry after the failed first attempt (issue #26)
             _LOGGER.debug("retry send after the failed first attempt")
-            await self.connection.send_message(room_id, message.text)
+            await self.connection.send_message_event(room_id, 
+                "m.room.message", await self._get_html_content(message.text))
 
     async def disconnect(self):
         self.session.close()
