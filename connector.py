@@ -1,11 +1,14 @@
-import sys
+import re
 import logging
 
 import aiohttp
+import markdown
+
 from opsdroid.connector import Connector
 from opsdroid.message import Message
 
 from .matrix_async import AsyncHTTPAPI
+from .html_cleaner import clean
 from matrix_client.errors import MatrixRequestError
 
 
@@ -106,18 +109,10 @@ class ConnectorMatrix(Connector):
         # Listen for new messages from the chat service
         while True:
             try:
-                try:
-                    response = await self.connection.sync(
-                        self.connection.sync_token,
-                        timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
-                        filter=self.filter_id)
-                except aiohttp.client_exceptions.ServerDisconnectedError:
-                    # Retry after the failed first attempt (issue #26)
-                    _LOGGER.debug("retry sync after the failed first attempt")
-                    response = await self.connection.sync(
-                        self.connection.sync_token,
-                        timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
-                        filter=self.filter_id)                    
+                response = await self.connection.sync(
+                    self.connection.sync_token,
+                    timeout_ms=int(6 * 60 * 60 * 1e3),  # 6h in ms
+                    filter=self.filter_id)
                 _LOGGER.debug("matrix sync request returned")
                 self.connection.sync_token = response["next_batch"]
                 for roomid in self.room_ids.values():
@@ -127,10 +122,11 @@ class ConnectorMatrix(Connector):
                             if event['content']['msgtype'] == 'm.text':
                                 if event['sender'] != self.mxid:
                                     message = Message(event['content']['body'],
-                                                      await self._get_nick(roomid, event['sender']),
+                                                      await self._get_nick(roomid,
+                                                                           event['sender']),
                                                       roomid, self)
                                     await opsdroid.parse(message)
-            except Exception as e:
+            except Exception:
                 _LOGGER.exception('Matrix Sync Error')
 
     async def _get_nick(self, roomid, mxid):
@@ -141,7 +137,7 @@ class ConnectorMatrix(Connector):
         if self.room_specific_nicks:
             try:
                 return await self.connection.get_room_displayname(roomid, mxid)
-            except Exception as e:
+            except Exception:
                 # Fallback to the non-room specific one
                 logging.exception("Failed to lookup room specific nick for {}".format(mxid))
 
@@ -153,17 +149,28 @@ class ConnectorMatrix(Connector):
                 logging.exception("Failed to lookup nick for {}".format(mxid))
             return mxid
 
-    async def _get_html_content(self, html, body=None, msgtype="m.text"):
+    async def _get_html_content(self, message, body=None, msgtype="m.text"):
         """
         Return the json representation of the message in
         "org.matrix.custom.html" format
         """
+        clean_markdown = clean(message)
+        html = markdown.markdown(message)
+        clean_html = clean(html)
+
+        # Markdown leaves a <p></p> around standard messages that we want to strip:
+        if clean_html.startswith('<p>'):
+            clean_html = clean_html[3:]
+            if clean_html.endswith('</p>'):
+                clean_html = clean_html[:-4]
+
         return {
-            "body": body if body else re.sub('<[^<]+?>', '', html),
+            # Strip out any tags from the markdown to make the body
+            "body": body if body else re.sub('<[^<]+?>', '', clean_markdown),
             "msgtype": msgtype,
             "format": "org.matrix.custom.html",
-            "formatted_body": html
-            }   
+            "formatted_body": clean_html
+            }
 
     async def respond(self, message, roomname=None):
         # Send message.text back to the chat service
@@ -181,13 +188,16 @@ class ConnectorMatrix(Connector):
             room_id = room_id
 
         try:
-            await self.connection.send_message_event(room_id, 
-                "m.room.message", await self._get_html_content(message.text))
+            await self.connection.send_message_event(
+                room_id,
+                "m.room.message",
+                await self._get_html_content(message.text))
         except aiohttp.client_exceptions.ServerDisconnectedError:
-            # Retry after the failed first attempt (issue #26)
-            _LOGGER.debug("retry send after the failed first attempt")
-            await self.connection.send_message_event(room_id, 
-                "m.room.message", await self._get_html_content(message.text))
+            _LOGGER.debug("Server had disconnected, retrying send.")
+            await self.connection.send_message_event(
+                room_id,
+                "m.room.message",
+                await self._get_html_content(message.text))
 
     async def disconnect(self):
         self.session.close()
