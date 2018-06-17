@@ -154,9 +154,7 @@ class ConnectorMatrix(Connector):
         Return the json representation of the message in
         "org.matrix.custom.html" format
         """
-        clean_markdown = clean(message)
-        html = markdown.markdown(message)
-        clean_html = clean(html)
+        clean_html = clean(message)
 
         # Markdown leaves a <p></p> around standard messages that we want to strip:
         if clean_html.startswith('<p>'):
@@ -166,7 +164,7 @@ class ConnectorMatrix(Connector):
 
         return {
             # Strip out any tags from the markdown to make the body
-            "body": body if body else re.sub('<[^<]+?>', '', clean_markdown),
+            "body": body if body else re.sub('<[^<]+?>', '', clean_html),
             "msgtype": msgtype,
             "format": "org.matrix.custom.html",
             "formatted_body": clean_html
