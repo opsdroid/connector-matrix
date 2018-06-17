@@ -154,10 +154,11 @@ class ConnectorMatrix(Connector):
         Return the json representation of the message in
         "org.matrix.custom.html" format
         """
+        clean_markdown = clean(message)
         html = markdown.markdown(message)
         clean_html = clean(html)
         return {
-            "body": body if body else re.sub('<[^<]+?>', '', clean_html),
+            "body": body if body else re.sub('<[^<]+?>', '', clean_markdown),
             "msgtype": msgtype,
             "format": "org.matrix.custom.html",
             "formatted_body": clean_html
