@@ -155,8 +155,13 @@ class ConnectorMatrix(Connector):
         "org.matrix.custom.html" format
         """
         clean_markdown = clean(message)
+        _LOGGER.debug(clean_markdown)
         html = markdown.markdown(message)
         clean_html = clean(html)
+        if clean_html.startswith('<p>'):
+            clean_html = clean_html[3:]
+            if clean_html.endswith('</p>'):
+                clean_html = clean_html[:-4]
         return {
             "body": body if body else re.sub('<[^<]+?>', '', clean_markdown),
             "msgtype": msgtype,
