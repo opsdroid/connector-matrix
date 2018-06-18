@@ -1,3 +1,2 @@
 matrix_client>=0.0.5
 bleach
-markdown
