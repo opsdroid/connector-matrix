@@ -2,7 +2,6 @@ import re
 import logging
 
 import aiohttp
-import markdown
 
 from opsdroid.connector import Connector
 from opsdroid.message import Message
