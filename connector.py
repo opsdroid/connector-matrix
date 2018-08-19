@@ -123,7 +123,8 @@ class ConnectorMatrix(Connector):
                                     message = Message(event['content']['body'],
                                                       await self._get_nick(roomid,
                                                                            event['sender']),
-                                                      roomid, self)
+                                                      roomid, self,
+                                                      raw_message=event)
                                     await opsdroid.parse(message)
             except Exception:
                 _LOGGER.exception('Matrix Sync Error')
