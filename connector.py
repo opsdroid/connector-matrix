@@ -199,3 +199,11 @@ class ConnectorMatrix(Connector):
 
     async def disconnect(self):
         self.session.close()
+
+    def get_roomname(self, room):
+        if room.startswith(('#', '!')):
+            for connroom in self.rooms:
+                if room == connroom or room == self.room_ids[connroom]:
+                    return connroom
+
+        return room
