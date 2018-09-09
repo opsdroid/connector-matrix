@@ -20,17 +20,39 @@ class ConnectorMatrix(Connector):
     def __init__(self, config):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
+
+        # Config parseing
         self.config = config  # The config dictionary to be accessed later
         self.rooms = config.get('rooms', None)
         if not self.rooms:
-            self.rooms = {'main': config['room']}
-        self.room_ids = {}
-        self.default_room = self.rooms['main']
+            self.rooms = {'main': {'alias': config['room']}}
+        else:
+            rooms = self._parse_room_config(config)
         self.mxid = config['mxid']
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
         self.password = config['password']
         self.room_specific_nicks = config.get("room_specific_nicks", False)
+
+        # Internal
+        self.room_ids = {}
+        self.default_room = self.rooms['main']['alias']  # TODO: Delete this?
+
+    def _parse_room_config(self, config):
+        """
+        This method provides backwards compatibility with the previous room
+        list as dict format by transforming dicts like `{"main": "#myroom:matrix.org"}` into
+        `{"main": {"alias": "#myroom:matrix.org"}}`.
+        """
+        new_rooms = {}
+        for name, room in config["rooms"].items():
+            if isinstance(room, str):
+                new_rooms[name] = {'alias': room}
+            elif isinstance(room, dict):
+                new_rooms[name] = room
+            else:
+                raise TypeError("Elements of the room config dictionary must be strings or dicts")
+        return new_rooms
 
     @property
     def filter_json(self):
@@ -88,7 +110,7 @@ class ConnectorMatrix(Connector):
         mapi.sync_token = None
 
         for roomname, room in self.rooms.items():
-            response = await mapi.join_room(room)
+            response = await mapi.join_room(room['alias'])
             self.room_ids[roomname] = response['room_id']
         self.connection = mapi
 
@@ -177,7 +199,7 @@ class ConnectorMatrix(Connector):
             # Connector responds in the same room it received the original message
             room_id = message.room
         else:
-            room_id = self.rooms[roomname]
+            room_id = self.rooms[roomname]['alias']
 
         # Ensure we have a room id not alias
         if not room_id.startswith('!'):
@@ -185,17 +207,22 @@ class ConnectorMatrix(Connector):
         else:
             room_id = room_id
 
+        # Get the msgtype to respond with based on first the global then the room config.
+        send_notice = self.config.get("send_m_notice", False)
+        send_notice = self.rooms[self.get_roomname(room_id)].get("send_m_notice", send_notice)
+        msgtype = "m.notice" if send_notice else "m.text"
+
         try:
             await self.connection.send_message_event(
                 room_id,
                 "m.room.message",
-                await self._get_html_content(message.text))
+                await self._get_html_content(message.text, msgtype=msgtype))
         except aiohttp.client_exceptions.ServerDisconnectedError:
             _LOGGER.debug("Server had disconnected, retrying send.")
             await self.connection.send_message_event(
                 room_id,
                 "m.room.message",
-                await self._get_html_content(message.text))
+                await self._get_html_content(message.text, msgtype=msgtype))
 
     async def disconnect(self):
         self.session.close()
