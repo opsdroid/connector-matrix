@@ -69,7 +69,8 @@ def clean(html, **kwargs):
     defaults = {
         'strip': True,
         'tags': ALLOWED_TAGS,
-        'attributes': ALLOWED_ATTRIBUTES
+        'attributes': ALLOWED_ATTRIBUTES,
+        'protocols': ['http', 'https', 'mailto', 'mxc']
     }
     defaults.update(kwargs)
 
