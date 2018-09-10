@@ -154,7 +154,7 @@ class ConnectorMatrix(Connector):
                     room = response['rooms']['join'].get(roomid, None)
                     if room and 'timeline' in room:
                         for event in room['timeline']['events']:
-                            if event['content']['msgtype'] == 'm.text':
+                            if event.get("content", {}).get("body", None):
                                 if event['sender'] != self.mxid:
                                     message = Message(self._parse_m_room_message(event),
                                                       await self._get_nick(roomid,
