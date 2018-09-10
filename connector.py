@@ -16,6 +16,20 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = ['ConnectorMatrix']
 
 
+def trim_reply_fallback_text(text: str) -> str:
+    # Copyright (C) 2018 Tulir Asokan
+    # Borrowed from https://github.com/tulir/mautrix-telegram/blob/master/mautrix_telegram/formatter/util.py
+    # Having been given explicit permission to include it "under the terms of any OSI approved licence"
+    # https://matrix.to/#/!FPUfgzXYWTKgIrwKxW:matrix.org/$15365871364925maRqg:maunium.net
+
+    if not text.startswith("> ") or "\n" not in text:
+        return text
+    lines = text.split("\n")
+    while len(lines) > 0 and lines[0].startswith("> "):
+        lines.pop(0)
+    return "\n".join(lines)
+
+
 class ConnectorMatrix(Connector):
     def __init__(self, config):
         # Init the config for the connector
@@ -142,7 +156,7 @@ class ConnectorMatrix(Connector):
                         for event in room['timeline']['events']:
                             if event['content']['msgtype'] == 'm.text':
                                 if event['sender'] != self.mxid:
-                                    message = Message(event['content']['body'],
+                                    message = Message(self._parse_m_room_message(event),
                                                       await self._get_nick(roomid,
                                                                            event['sender']),
                                                       roomid, self,
@@ -150,6 +164,15 @@ class ConnectorMatrix(Connector):
                                     await opsdroid.parse(message)
             except Exception:
                 _LOGGER.exception('Matrix Sync Error')
+
+    def _parse_m_room_message(self, event):
+        """
+        Call this to strip out replies.
+        """
+        if event["content"].get("m.relates_to", {}).get("m.in_reply_to", None):
+            return trim_reply_fallback_text(event['content']['body'])
+        else:
+            return event['content']['body']
 
     async def _get_nick(self, roomid, mxid):
         """
