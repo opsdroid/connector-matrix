@@ -27,7 +27,7 @@ def trim_reply_fallback_text(text: str) -> str:
     lines = text.split("\n")
     while len(lines) > 0 and lines[0].startswith("> "):
         lines.pop(0)
-    return "\n".join(lines)
+    return "\n".join(lines).strip()
 
 
 class ConnectorMatrix(Connector):
