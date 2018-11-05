@@ -247,7 +247,7 @@ class ConnectorMatrix(Connector):
                 "m.room.message",
                 await self._get_html_content(message.text, msgtype=msgtype))
 
-    async def disconnect(self):
+    async def disconnect(self, opsdroid=None):
         self.session.close()
 
     def get_roomname(self, room):
