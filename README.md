@@ -21,10 +21,14 @@ connectors:
     # Alternatively, a dictionary of multiple rooms
     # One of these should be named 'main'
     rooms:
-      'main': '#matrix:matrix.org'
-      'other': '#riot:matrix.org'
+      'main': 
+        alias: '#matrix:matrix.org'
+      'other': 
+        alias: '#riot:matrix.org'
+        send_m_notice: False  # Send messages to this room as m.notice events rather than m.message
     # Optional
     homeserver: "https://matrix.org"
     nick: "Botty McBotface"  # The nick will be set on startup
     room_specific_nicks: False  # Look up room specific nicknames of senders (expensive in large rooms)
+    send_m_notice: False  # Send all messages as m.notice events rather than m.message
 ```

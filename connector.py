@@ -6,7 +6,7 @@ import aiohttp
 from opsdroid.connector import Connector
 from opsdroid.message import Message
 
-from .matrix_async import AsyncHTTPAPI
+from matrix_api_async import AsyncHTTPAPI
 from .html_cleaner import clean
 from matrix_client.errors import MatrixRequestError
 
@@ -16,21 +16,58 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = ['ConnectorMatrix']
 
 
+def trim_reply_fallback_text(text):
+    # Copyright (C) 2018 Tulir Asokan
+    # Borrowed from https://github.com/tulir/mautrix-telegram/blob/master/mautrix_telegram/formatter/util.py
+    # Having been given explicit permission to include it "under the terms of any OSI approved licence"
+    # https://matrix.to/#/!FPUfgzXYWTKgIrwKxW:matrix.org/$15365871364925maRqg:maunium.net
+
+    if not text.startswith("> ") or "\n" not in text:
+        return text
+    lines = text.split("\n")
+    while len(lines) > 0 and lines[0].startswith("> "):
+        lines.pop(0)
+    return "\n".join(lines).strip()
+
+
+def parse_room_config(config):
+    """
+    This method provides backwards compatibility with the previous room
+    list as dict format by transforming dicts like `{"main": "#myroom:matrix.org"}` into
+    `{"main": {"alias": "#myroom:matrix.org"}}`.
+    """
+    new_rooms = {}
+    for name, room in config["rooms"].items():
+        if isinstance(room, str):
+            new_rooms[name] = {'alias': room}
+        elif isinstance(room, dict):
+            new_rooms[name] = room
+        else:
+            raise TypeError("Elements of the room config dictionary must be strings or dicts")
+    return new_rooms
+
+
 class ConnectorMatrix(Connector):
     def __init__(self, config):
         # Init the config for the connector
         self.name = "ConnectorMatrix"  # The name of your connector
+
+        # Config parseing
         self.config = config  # The config dictionary to be accessed later
         self.rooms = config.get('rooms', None)
         if not self.rooms:
-            self.rooms = {'main': config['room']}
-        self.room_ids = {}
-        self.default_room = self.rooms['main']
+            self.rooms = {'main': {'alias': config['room']}}
+        else:
+            rooms = parse_room_config(config)
         self.mxid = config['mxid']
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
         self.password = config['password']
         self.room_specific_nicks = config.get("room_specific_nicks", False)
+
+        # Internal
+        self.room_ids = {}
+        self.default_room = self.rooms['main']['alias']  # TODO: Delete this?
 
     @property
     def filter_json(self):
@@ -88,7 +125,7 @@ class ConnectorMatrix(Connector):
         mapi.sync_token = None
 
         for roomname, room in self.rooms.items():
-            response = await mapi.join_room(room)
+            response = await mapi.join_room(room['alias'])
             self.room_ids[roomname] = response['room_id']
         self.connection = mapi
 
@@ -118,9 +155,9 @@ class ConnectorMatrix(Connector):
                     room = response['rooms']['join'].get(roomid, None)
                     if room and 'timeline' in room:
                         for event in room['timeline']['events']:
-                            if event['content']['msgtype'] == 'm.text':
+                            if event.get("content", {}).get("body", None):
                                 if event['sender'] != self.mxid:
-                                    message = Message(event['content']['body'],
+                                    message = Message(self._parse_m_room_message(event),
                                                       await self._get_nick(roomid,
                                                                            event['sender']),
                                                       roomid, self,
@@ -128,6 +165,15 @@ class ConnectorMatrix(Connector):
                                     await opsdroid.parse(message)
             except Exception:
                 _LOGGER.exception('Matrix Sync Error')
+
+    def _parse_m_room_message(self, event):
+        """
+        Call this to strip out replies.
+        """
+        if event["content"].get("m.relates_to", {}).get("m.in_reply_to", None):
+            return trim_reply_fallback_text(event['content']['body'])
+        else:
+            return event['content']['body']
 
     async def _get_nick(self, roomid, mxid):
         """
@@ -177,7 +223,7 @@ class ConnectorMatrix(Connector):
             # Connector responds in the same room it received the original message
             room_id = message.room
         else:
-            room_id = self.rooms[roomname]
+            room_id = self.rooms[roomname]['alias']
 
         # Ensure we have a room id not alias
         if not room_id.startswith('!'):
@@ -185,19 +231,24 @@ class ConnectorMatrix(Connector):
         else:
             room_id = room_id
 
+        # Get the msgtype to respond with based on first the global then the room config.
+        send_notice = self.config.get("send_m_notice", False)
+        send_notice = self.rooms[self.get_roomname(room_id)].get("send_m_notice", send_notice)
+        msgtype = "m.notice" if send_notice else "m.text"
+
         try:
             await self.connection.send_message_event(
                 room_id,
                 "m.room.message",
-                await self._get_html_content(message.text))
+                await self._get_html_content(message.text, msgtype=msgtype))
         except aiohttp.client_exceptions.ServerDisconnectedError:
             _LOGGER.debug("Server had disconnected, retrying send.")
             await self.connection.send_message_event(
                 room_id,
                 "m.room.message",
-                await self._get_html_content(message.text))
+                await self._get_html_content(message.text, msgtype=msgtype))
 
-    async def disconnect(self):
+    async def disconnect(self, opsdroid=None):
         self.session.close()
 
     def get_roomname(self, room):
