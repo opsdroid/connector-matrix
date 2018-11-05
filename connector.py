@@ -6,7 +6,7 @@ import aiohttp
 from opsdroid.connector import Connector
 from opsdroid.message import Message
 
-from .matrix_async import AsyncHTTPAPI
+from matrix_api_async import AsyncHTTPAPI
 from .html_cleaner import clean
 from matrix_client.errors import MatrixRequestError
 
@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 __all__ = ['ConnectorMatrix']
 
 
-def trim_reply_fallback_text(text: str) -> str:
+def trim_reply_fallback_text(text):
     # Copyright (C) 2018 Tulir Asokan
     # Borrowed from https://github.com/tulir/mautrix-telegram/blob/master/mautrix_telegram/formatter/util.py
     # Having been given explicit permission to include it "under the terms of any OSI approved licence"
@@ -30,6 +30,23 @@ def trim_reply_fallback_text(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def parse_room_config(config):
+    """
+    This method provides backwards compatibility with the previous room
+    list as dict format by transforming dicts like `{"main": "#myroom:matrix.org"}` into
+    `{"main": {"alias": "#myroom:matrix.org"}}`.
+    """
+    new_rooms = {}
+    for name, room in config["rooms"].items():
+        if isinstance(room, str):
+            new_rooms[name] = {'alias': room}
+        elif isinstance(room, dict):
+            new_rooms[name] = room
+        else:
+            raise TypeError("Elements of the room config dictionary must be strings or dicts")
+    return new_rooms
+
+
 class ConnectorMatrix(Connector):
     def __init__(self, config):
         # Init the config for the connector
@@ -41,7 +58,7 @@ class ConnectorMatrix(Connector):
         if not self.rooms:
             self.rooms = {'main': {'alias': config['room']}}
         else:
-            rooms = self._parse_room_config(config)
+            rooms = parse_room_config(config)
         self.mxid = config['mxid']
         self.nick = config.get('nick', None)
         self.homeserver = config.get('homeserver', "https://matrix.org")
@@ -51,22 +68,6 @@ class ConnectorMatrix(Connector):
         # Internal
         self.room_ids = {}
         self.default_room = self.rooms['main']['alias']  # TODO: Delete this?
-
-    def _parse_room_config(self, config):
-        """
-        This method provides backwards compatibility with the previous room
-        list as dict format by transforming dicts like `{"main": "#myroom:matrix.org"}` into
-        `{"main": {"alias": "#myroom:matrix.org"}}`.
-        """
-        new_rooms = {}
-        for name, room in config["rooms"].items():
-            if isinstance(room, str):
-                new_rooms[name] = {'alias': room}
-            elif isinstance(room, dict):
-                new_rooms[name] = room
-            else:
-                raise TypeError("Elements of the room config dictionary must be strings or dicts")
-        return new_rooms
 
     @property
     def filter_json(self):
