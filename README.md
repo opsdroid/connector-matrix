@@ -1,3 +1,5 @@
+⚠ *DEPRECATED* ⚠ This connector is now built in to [opsdroid core](https://opsdroid.readthedocs.io/en/stable/connectors/matrix/). This repository only exists for backward compatibility and will be removed.
+
 # opsdroid connector Matrix
 
 A connector for [opsdroid](https://github.com/opsdroid/opsdroid) to receive and respond to messages in [Matrix](https://matrix.org/) rooms. 
